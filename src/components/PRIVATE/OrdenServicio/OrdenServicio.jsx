@@ -20,8 +20,8 @@ import Portal from "../Portal/Portal";
 import "./ordernServicio.scss";
 
 import { ReactComponent as Eliminar } from "../../../utils/img/OrdenServicio/eliminar.svg";
-import { ReactComponent as Lavadora } from "../../../utils/img/OrdenServicio/lavadora.svg";
-// import { ReactComponent as Logo } from '../../../utils/img/Logo/logoMasterClean.svg';
+// import { ReactComponent as Lavadora } from '../../../utils/img/OrdenServicio/lavadora.svg';
+import { ReactComponent as Logo } from "../../../utils/img/Logo/logoRapiwash.svg";
 
 import Tranferencia from "../../../utils/img/OrdenServicio/Transferencia.png";
 import Efectivo from "../../../utils/img/OrdenServicio/dinero.png";
@@ -55,7 +55,6 @@ import {
   documento,
   ingresoDigital,
   nameImpuesto,
-  nameMoneda,
   simboloMoneda,
 } from "../../../services/global";
 import ButtonSwitch from "../MetodoPago/ButtonSwitch/ButtonSwitch";
@@ -74,11 +73,6 @@ const OrdenServicio = ({
   const InfoUsuario = useSelector((state) => state.user.infoUsuario);
   const InfoLastCuadre = useSelector((state) => state.cuadre.lastCuadre);
   const InfoCuadreActual = useSelector((state) => state.cuadre.cuadreActual);
-
-  const InfoServicios = useSelector((state) => state.servicios.listServicios);
-  const InfoCategorias = useSelector(
-    (state) => state.categorias.listCategorias
-  );
 
   const { InfoImpuesto, InfoPuntos } = useSelector(
     (state) => state.modificadores
@@ -105,27 +99,15 @@ const OrdenServicio = ({
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
-  const getInfoDelivery = () => {
-    const ICategory = InfoCategorias.find((cat) => cat.nivel === "primario");
-    const IService = InfoServicios.find(
-      (service) =>
-        service.idCategoria === ICategory._id && service.nombre === "Delivery"
-    );
-
-    return IService;
-  };
-
   const validationSchema = Yup.object().shape({
     name: Yup.string().required("Campo obligatorio"),
-    items: Yup.array()
-      .min(1, "Debe haber al menos un item")
+    productos: Yup.array()
+      .min(1, "Debe haber al menos un producto")
       .test(
         "categoria",
-        "Debe haber al menos un item - Delivery no cuenta",
+        "Debe haber al menos un producto - Delivery no cuenta",
         function (value) {
-          return value.some(
-            (item) => item.identificador !== getInfoDelivery()._id
-          );
+          return value.some((item) => item.categoria !== "Delivery");
         }
       )
       .of(
@@ -137,30 +119,15 @@ const OrdenServicio = ({
       ),
   });
 
-  const getItemsAdaptados = (Items) => {
-    return Items.map((item) => {
-      // Transforma cada item a la nueva estructura
-      const isDelivery =
-        getInfoDelivery()._id === item.identificador ? true : false;
-      return {
-        cantidad: item.cantidad,
-        identificador: item.identificador,
-        simboloMedida: item.simboloMedida,
-        tipo: item.tipo,
-        item: item.item,
-        descripcion: item.descripcion,
-        expanded: false, // Valor estático para el ejemplo
-        price: item.precio,
-        total: item.total, // Similar para 'total'
-        disable: {
-          cantidad: true,
-          item: true,
-          descripcion: isDelivery,
-          total: true,
-          action: true,
-        },
-      };
-    });
+  const getPricePrenda = (nombre) => {
+    const garment = infoPrendas.find(
+      (prenda) => prenda.name.toLowerCase() === nombre.toLowerCase()
+    );
+    if (garment) {
+      return garment.price;
+    }
+
+    return 0;
   };
 
   const formik = useFormik({
@@ -184,26 +151,19 @@ const OrdenServicio = ({
       dayhour: iEdit?.datePrevista?.hora || "17:00",
       listPago: iEdit ? iEdit.ListPago : [],
       pago: iEdit ? iEdit.Pago : "Pendiente",
-      items: iEdit
-        ? getItemsAdaptados(iEdit.Items)
+      productos: iEdit
+        ? iEdit.Producto
         : mode === "Delivery"
         ? [
             {
-              identificador: getInfoDelivery()._id,
-              tipo: "servicio",
               cantidad: 1,
-              item: "Delivery",
-              simboloMedida: "vj",
               descripcion: "Recojo y Entrega",
-              price: getInfoDelivery().precioVenta,
-              total: getInfoDelivery().precioVenta,
-              disable: {
-                cantidad: true,
-                item: true,
-                descripcion: true,
-                total: false,
-                action: true,
-              },
+              expanded: false,
+              price: 0,
+              producto: "Delivery",
+              stado: true,
+              total: getPricePrenda("Delivery"),
+              type: "Delivery",
             },
           ]
         : [],
@@ -237,7 +197,7 @@ const OrdenServicio = ({
         iEdit?.estado !== "registrado" &&
         values.modoDescuento === "Promocion"
       ) {
-        correcciones = await validItems(
+        correcciones = await validProductos(
           values.cargosExtras.beneficios.promociones
         );
       }
@@ -276,48 +236,18 @@ const OrdenServicio = ({
     });
   };
 
-  const addRowGarment = (idServicio) => {
-    const IService = InfoServicios.find(
-      (service) => service._id === idServicio
-    );
-    const ICategory = InfoCategorias.find(
-      (cat) => cat._id === IService.idCategoria
-    );
-
-    const isDelivery =
-      ICategory.nivel === "primario" && IService.nombre === "Delivery"
-        ? true
-        : false;
-    const isOtros =
-      ICategory.nivel === "primario"
-        ? IService.nombre === "Otros"
-          ? true
-          : false
-        : false;
-    const isEditSaved = iEdit?.estado === "registrado" ? true : false;
-
+  const addRowGarment = (producto, precio, stateCantidad) => {
+    const tipo = producto === "Otros" ? "Otros" : "Prenda";
     const newRow = {
+      stado: stateCantidad,
+      price: precio,
+      type: tipo,
       cantidad: 1,
-      item:
-        IService.nombre === "Otros" && ICategory.name === "Unico"
-          ? ""
-          : IService.nombre,
+      producto: producto === "Otros" ? "" : producto,
       descripcion: "",
       expanded: false,
-      price: IService.precioVenta,
-      total: IService.precioVenta,
-      tipo: "servicio",
-      identificador: IService._id,
-      simboloMedida: IService.simboloMedida,
-      disable: {
-        cantidad: isEditSaved ? true : isDelivery ? true : false,
-        item: isEditSaved ? true : isDelivery ? true : isOtros ? false : true,
-        descripcion: isDelivery,
-        total: isEditSaved,
-        action: isDelivery,
-      },
+      total: precio,
     };
-
     return newRow;
   };
 
@@ -395,12 +325,9 @@ const OrdenServicio = ({
   };
 
   const handleGetInfo = async (info) => {
-    const infoIntem = info.items.map((p) => ({
-      identificador: p.identificador,
-      tipo: p.tipo,
+    const infoProduct = info.productos.map((p) => ({
       cantidad: p.cantidad,
-      item: p.item,
-      simboloMedida: p.simboloMedida,
+      producto: p.producto,
       descripcion: p.descripcion,
       precio: p.price,
       total: p.total,
@@ -416,8 +343,7 @@ const OrdenServicio = ({
     !iEdit ||
       iEdit.dateRecepcion.fecha === DateCurrent().format4 ||
       iEdit?.estado === "reservado";
-
-    const infoOrden = {
+    const infoRecibo = {
       codRecibo: iEdit ? iEdit.codRecibo : iCodigo,
       dateRecepcion: {
         fecha: tFecha(info.dateRecojo),
@@ -425,7 +351,7 @@ const OrdenServicio = ({
       },
       Modalidad: delivery ? "Delivery" : "Tienda",
       Nombre: info.name,
-      Items: infoIntem,
+      Producto: infoProduct,
       celular: info.phone,
       Pago: info.pago,
       ListPago: info.listPago,
@@ -472,7 +398,7 @@ const OrdenServicio = ({
     };
 
     onAction({
-      infoOrden,
+      infoRecibo,
       rol: InfoUsuario.rol,
     });
 
@@ -523,8 +449,8 @@ const OrdenServicio = ({
     }
   };
 
-  const validItems = async (promociones) => {
-    const listItems = formik.values.items;
+  const validProductos = async (promociones) => {
+    const listProductos = formik.values.productos;
     const ListCorrecciones = [];
 
     // si la promo es la misma reducirla a 1 sola
@@ -533,99 +459,59 @@ const OrdenServicio = ({
       if (!result.some((r) => r.codigoPromocion === codigoPromocion)) {
         result.push(item);
       }
-
       return result;
     }, []);
 
     for (const p of listP) {
       const infoCupon = await validCupon(p.codigoCupon);
-
-      const idServicios = infoCupon.promocion.prenda;
-
-      let servicios = [];
-
-      // Crear un arreglo con la información de los servicios asociados a cada identificador
-      idServicios.forEach((serviceID) => {
-        const infoService = InfoServicios.find((i) => i._id === serviceID);
-        if (infoService) {
-          // Verificar si se encontró la información del servicio
-          servicios.push({
-            identificador: infoService._id,
-            servicio: infoService.nombre,
-            simbolo: infoService.simboloMedida,
-          });
-        }
-      });
-
-      const identificadoresReferencia = servicios.map(
-        (item) => item.identificador
+      const prendaActual = infoCupon.promocion.prenda;
+      const productosFiltrados = listProductos.filter(
+        (p) => p.producto === prendaActual
       );
-
-      // Filtrar los elementos de la lista base que coinciden con los identificadores de la lista de referencia
-      const itemsValidos = listItems.filter((item) =>
-        identificadoresReferencia.includes(item.identificador)
+      const cantActual = productosFiltrados.reduce(
+        (total, producto) => total + +Number(producto.cantidad).toFixed(1),
+        0
       );
 
       const cantMin = infoCupon.promocion.cantidadMin;
-
-      const handleGetCaActual = (atributo) =>
-        itemsValidos.reduce((total, item) => total + +item[atributo], 0);
-
-      let infoFaltante = "";
-      let cantActual = 0;
-      if (infoCupon.promocion.tipoPromocion === "Varios") {
-        // // console.log("Varios :");
-        // Varios
-        if (infoCupon.promocion.tipoDescuento === "Porcentaje") {
-          // // console.log("Porcentaje :");
-          // Pocentaje
-          cantActual = handleGetCaActual("cantidad");
-          // // console.log(cantActual);
-        } else {
-          // // console.log("Monto :");
-          // Monto
-          cantActual = handleGetCaActual("total");
-          // // console.log(cantActual);
-        }
-      } else {
-        // // console.log("Unico :");
-        // Unico
-        cantActual = handleGetCaActual("cantidad");
-        // // if (infoCupon.promocion.tipoDescuento === "Porcentaje") {
-        // //   console.log("Porcentaje :");
-        // //   // Pocentaje
-        // // } else {
-        // //   console.log("Gratis :");
-        // //   // Gratis
-        // // }
-        // // console.log(cantActual);
-      }
-
       const res = cantActual >= cantMin;
-
-      if (infoCupon.promocion.tipoPromocion === "Unico") {
-        if (!res) {
-          infoFaltante = `${`Minimo ${cantMin}${
-            servicios[0].simbolo
-          } del servicio "${servicios[0].servicio}" y ${
+      if (!res) {
+        //const nPrendasFaltante = cantMin - sumaCantidades; // falta registrar
+        let infoFaltante = "";
+        if (prendaActual === "Ropa x Kilo") {
+          infoFaltante = `Minimo ${cantMin} kilo${
+            cantMin !== 1 ? "s" : ""
+          } de Ropa y ${
             cantActual === 0
               ? "no registraste ninguno"
-              : `solo registraste : ${cantActual}${servicios[0].simbolo}`
-          }`}`;
+              : `solo registraste : ${cantActual}`
+          }  `;
+        } else if (prendaActual === "Cortinas") {
+          infoFaltante = `Minimo ${cantMin} metro${
+            cantMin !== 1 ? "s" : ""
+          } de ${prendaActual} y ${
+            cantActual === 0
+              ? "no registraste ninguno"
+              : `solo registraste : ${cantActual}`
+          }  `;
+        } else if (prendaActual === "Zapatillas") {
+          infoFaltante = `Minimo ${cantMin} par${
+            cantMin !== 1 ? "es" : ""
+          } de ${prendaActual} y ${
+            cantActual === 0
+              ? "no registraste ninguno"
+              : `solo registraste : ${cantActual}`
+          }  `;
+        } else {
+          infoFaltante = `Minimo ${cantMin} prenda${
+            cantMin !== 1 ? "s" : ""
+          } de tipo ${prendaActual} y ${
+            cantActual === 0
+              ? "no registraste ninguno"
+              : `solo registraste : ${cantActual}`
+          }  `;
         }
-      } else {
-        if (!res) {
-          if (infoCupon.promocion.tipoDescuento === "Monto") {
-            infoFaltante = `${`Minimo ${simboloMoneda}${cantMin} en gastos de servicio y ${
-              cantActual === 0
-                ? "no registraste ninguno"
-                : `solo registro : ${simboloMoneda}${cantActual}`
-            }`}`;
-          }
-        }
-      }
 
-      if (infoFaltante) {
         ListCorrecciones.push(infoFaltante);
       }
     }
@@ -633,10 +519,10 @@ const OrdenServicio = ({
     return ListCorrecciones;
   };
 
-  const sumaTotalesItems = (listItems) => {
-    return listItems.reduce((total, item) => {
-      const ItemTotal = parseFloat(item.total);
-      return isNaN(ItemTotal) ? total : total + ItemTotal;
+  const sumaTotalesProductos = (listProductos) => {
+    return listProductos.reduce((total, prenda) => {
+      const prendaTotal = parseFloat(prenda.total);
+      return isNaN(prendaTotal) ? total : total + prendaTotal;
     }, 0);
   };
 
@@ -653,22 +539,21 @@ const OrdenServicio = ({
     ].map((codigoPromocion) =>
       cupTypeDsc.filter((item) => item.codigoPromocion === codigoPromocion)
     );
-
     // Iterar a través de grupos de cupones
     if (groupCupon.length > 0) {
       for (const grupo of groupCupon) {
         for (const dsc of grupo) {
-          let itemsConsideradas;
+          let prendasConsideradas;
           if (dsc.tipoPromocion === "Varios") {
-            if (dsc.alcance === "Todos") {
-              itemsConsideradas = formik.values.items;
+            if (dsc.prenda.includes("Todos")) {
+              prendasConsideradas = formik.values.productos;
             } else {
-              itemsConsideradas = formik.values.items.filter((elemento) =>
-                dsc.prenda.includes(elemento.identificador)
+              prendasConsideradas = formik.values.productos.filter((elemento) =>
+                dsc.prenda.includes(elemento.producto)
               );
             }
 
-            let sumaTotales = sumaTotalesItems(itemsConsideradas);
+            let sumaTotales = sumaTotalesProductos(prendasConsideradas);
 
             const dscFinal = +parseFloat(
               sumaTotales * (dsc.nMultiplicador / 100)
@@ -681,12 +566,12 @@ const OrdenServicio = ({
             });
             sumaTotales -= dscFinal;
           } else {
-            const prenda = grupo[0].prenda[0];
-            itemsConsideradas = formik.values.items.filter(
-              (i) => i.identificador === prenda
+            const prenda = grupo[0].prenda;
+            prendasConsideradas = formik.values.productos.filter(
+              (p) => p.producto === prenda
             );
-            if (itemsConsideradas.length > 0) {
-              let sumaTotales = sumaTotalesItems(itemsConsideradas);
+            if (prendasConsideradas.length > 0) {
+              let sumaTotales = sumaTotalesProductos(prendasConsideradas);
 
               // Calcular descuentos y actualizar sumaTotales
 
@@ -710,7 +595,6 @@ const OrdenServicio = ({
               });
             }
           }
-
           formik.setFieldValue(
             "cargosExtras.beneficios.promociones",
             updateCupon
@@ -744,12 +628,12 @@ const OrdenServicio = ({
     return equivalenteEnSoles;
   };
 
-  const calculateTotalNeto = (items) => {
+  const calculateTotalNeto = (productos) => {
     let subtotal = 0;
 
-    if (items && items.length > 0) {
-      subtotal = items.reduce((sum, item) => {
-        const total = parseFloat(item.total) || 0;
+    if (productos && productos.length > 0) {
+      subtotal = productos.reduce((sum, producto) => {
+        const total = parseFloat(producto.total) || 0;
 
         return sum + total;
       }, 0);
@@ -795,15 +679,21 @@ const OrdenServicio = ({
   }, [InfoPuntos, InfoImpuesto]);
 
   useEffect(() => {
-    const subtotal = Number(calculateTotalNeto(formik.values.items).toFixed(2));
+    const subtotal = Number(
+      calculateTotalNeto(formik.values.productos).toFixed(2)
+    );
     formik.setFieldValue("subTotal", subtotal);
-  }, [formik.values.items]);
+  }, [formik.values.productos]);
 
   useEffect(() => {
     if (!iEdit || iEdit?.estado === "reservado") {
       recalculatePromoDescuento();
     }
-  }, [formik.values.items, listCupones.length, formik.values.modoDescuento]);
+  }, [
+    formik.values.productos,
+    listCupones.length,
+    formik.values.modoDescuento,
+  ]);
 
   useEffect(() => {
     const subTotal = formik.values.subTotal;
@@ -825,7 +715,7 @@ const OrdenServicio = ({
     );
   }, [
     formik.values.cargosExtras.igv,
-    formik.values.items,
+    formik.values.productos,
     formik.values.modoDescuento,
     formik.values.cargosExtras.descuentos,
     formik.values.cargosExtras.descuento,
@@ -892,19 +782,14 @@ const OrdenServicio = ({
         <div className="body-form">
           <div className="c-title">
             <div className="info-t">
-              <Lavadora className="ico-lava-ya" />
               <div className="title">
-                <h1>{InfoNegocio?.name}</h1>
-                <h2>LAVANDERIA</h2>
+                <Logo className="ico-logo" />
                 {Object.keys(InfoNegocio).length > 0 ? (
                   <h3>
                     {DiasAttencion(InfoNegocio?.horario.dias)}
                     <br />
                     {HoraAttencion(InfoNegocio?.horario.horas)}
                   </h3>
-                ) : null}
-                {InfoNegocio?.numero?.state ? (
-                  <h3>Cel.: {InfoNegocio?.numero?.info}</h3>
                 ) : null}
               </div>
             </div>
@@ -1152,38 +1037,44 @@ const OrdenServicio = ({
           <div className="description-info">
             <div className="actions">
               <div className="button-actions">
-                {InfoNegocio.itemsAtajos.length > 0
-                  ? InfoNegocio.itemsAtajos.map((items, index) => {
-                      const IService = InfoServicios.find(
-                        (service) => service._id === items
-                      );
-
-                      return (
-                        <BotonModel
-                          key={index}
-                          name={`Agregar ${IService?.nombre}`}
-                          // tabI="7"
-                          disabled={
-                            iEdit ? (iEdit.modeEditAll ? false : true) : false
-                          }
-                          listenClick={() => {
-                            formik.setFieldValue("items", [
-                              ...formik.values.items,
-                              addRowGarment(IService?._id),
-                            ]);
-                          }}
-                        />
-                      );
-                    })
-                  : null}
+                <BotonModel
+                  name="Agregar Edredon"
+                  tabI="7"
+                  disabled={iEdit ? (iEdit.modeEditAll ? false : true) : false}
+                  listenClick={() =>
+                    formik.setFieldValue("productos", [
+                      ...formik.values.productos,
+                      addRowGarment(
+                        "Edredon",
+                        getPricePrenda("Edredon"),
+                        false
+                      ),
+                    ])
+                  }
+                />
+                <BotonModel
+                  name="Ropa x Kilo"
+                  tabI="8"
+                  disabled={iEdit ? (iEdit.modeEditAll ? false : true) : false}
+                  listenClick={() =>
+                    formik.setFieldValue("productos", [
+                      ...formik.values.productos,
+                      addRowGarment(
+                        "Ropa x Kilo",
+                        getPricePrenda("Ropa x Kilo"),
+                        false
+                      ),
+                    ])
+                  }
+                />
               </div>
               <InputSelectedPrendas
-                listenClick={(info) => {
-                  formik.setFieldValue("items", [
-                    ...formik.values.items,
-                    addRowGarment(info),
-                  ]);
-                }}
+                listenClick={(producto, precio, estado) =>
+                  formik.setFieldValue("productos", [
+                    ...formik.values.productos,
+                    addRowGarment(producto, precio, estado),
+                  ])
+                }
                 disabled={iEdit ? (iEdit.modeEditAll ? false : true) : false}
                 tabI={"9"}
               />
@@ -1192,14 +1083,14 @@ const OrdenServicio = ({
               <thead>
                 <tr>
                   <th>Cantidad</th>
-                  <th>Item</th>
+                  <th>Producto</th>
                   <th>Descripción</th>
                   <th>Total</th>
                   <th>{""}</th>
                 </tr>
               </thead>
               <tbody>
-                {formik.values.items.map((row, index) => (
+                {formik.values.productos.map((row, index) => (
                   <tr key={index}>
                     <td
                       style={{
@@ -1210,9 +1101,19 @@ const OrdenServicio = ({
                       <input
                         type="text"
                         className="txtCantidad"
-                        name={`items.${index}.cantidad`}
+                        name={`productos.${index}.cantidad`}
                         autoComplete="off"
-                        disabled={row.disable.cantidad}
+                        disabled={
+                          iEdit?.estado === "registrado"
+                            ? true
+                            : row.producto === "Ropa x Kilo"
+                            ? false
+                            : row.type === "productos" && row.stado === true
+                            ? true
+                            : row.type === "Delivery"
+                            ? true
+                            : false
+                        }
                         onChange={(e) => {
                           const inputValue = e.target.value;
                           const validInput = inputValue
@@ -1222,42 +1123,65 @@ const OrdenServicio = ({
                             validInput !== "" ? validInput : "";
 
                           const price =
-                            parseFloat(formik.values.items[index].price) || 0;
+                            parseFloat(formik.values.productos[index].price) ||
+                            0;
                           const newTotal =
                             newQuantity !== "" ? newQuantity * price : "";
 
                           formik.setFieldValue(
-                            `items.${index}.cantidad`,
+                            `productos.${index}.cantidad`,
                             newQuantity
                           );
                           formik.setFieldValue(
-                            `items.${index}.total`,
+                            `productos.${index}.total`,
                             newTotal !== "" && newTotal !== 0
                               ? newTotal.toFixed(1)
                               : ""
                           );
                         }}
-                        autoFocus={true}
+                        autoFocus={
+                          row.producto === "Ropa x Kilo"
+                            ? true
+                            : row.type === "otros"
+                            ? true
+                            : row.type === "productos" && row.stado === false
+                            ? true
+                            : false
+                        }
                         onBlur={(e) => {
                           const inputValue = e.target.value;
                           if (inputValue === "0") {
                             // Si el usuario ingresa "0", establece el valor del campo a una cadena vacía
-                            formik.setFieldValue(`items.${index}.cantidad`, "");
-                            formik.setFieldValue(`items.${index}.total`, "");
+                            formik.setFieldValue(
+                              `productos.${index}.cantidad`,
+                              ""
+                            );
+                            formik.setFieldValue(
+                              `productos.${index}.total`,
+                              ""
+                            );
                           }
                         }}
-                        value={formik.values.items[index].cantidad || ""}
+                        value={formik.values.productos[index].cantidad || ""}
                         required
                       />
-                      {formik.values.items[index].cantidad < 0.1 &&
+                      {formik.values.productos[index].cantidad < 0.1 &&
                         icoValid("La cantidad debe ser mayor a 0.1")}
                     </td>
                     <td>
                       <input
                         type="text"
                         className="txtProducto"
-                        disabled={row.disable.item}
-                        name={`items.${index}.item`}
+                        disabled={
+                          iEdit?.estado === "registrado"
+                            ? true
+                            : row.type === "Otros"
+                            ? false
+                            : row.type === "Prenda"
+                            ? !row.estado
+                            : true
+                        }
+                        name={`productos.${index}.producto`}
                         onChange={(e) => {
                           const newValue = e.target.value;
                           if (newValue.length <= 15) {
@@ -1266,7 +1190,7 @@ const OrdenServicio = ({
                         }}
                         autoComplete="off"
                         onBlur={formik.handleBlur}
-                        value={formik.values.items[index].item}
+                        value={formik.values.productos[index].producto}
                         required
                       />
                     </td>
@@ -1275,8 +1199,8 @@ const OrdenServicio = ({
                         <div className="textarea-container">
                           <textarea
                             rows={1}
-                            id={`items.${index}.descripcion`}
-                            name={`items.${index}.descripcion`}
+                            id={`productos.${index}.descripcion`}
+                            name={`productos.${index}.descripcion`}
                             onChange={(e) => {
                               const inputValue = e.target.value;
 
@@ -1291,11 +1215,11 @@ const OrdenServicio = ({
                                 : "";
 
                               formik.setFieldValue(
-                                `items.${index}.descripcion`,
+                                `productos.${index}.descripcion`,
                                 updatedValue
                               );
                               formik.setFieldValue(
-                                `items.${index}.expanded`,
+                                `productos.${index}.expanded`,
                                 true
                               );
 
@@ -1306,14 +1230,14 @@ const OrdenServicio = ({
                                 event.preventDefault();
 
                                 // Añade el check de "✔" al texto existente
-                                const updatedValue = `${formik.values.items[index].descripcion}\n✔ `;
+                                const updatedValue = `${formik.values.productos[index].descripcion}\n✔ `;
                                 formik.setFieldValue(
-                                  `items.${index}.descripcion`,
+                                  `productos.${index}.descripcion`,
                                   updatedValue
                                 );
 
                                 formik.setFieldValue(
-                                  `items.${index}.expanded`,
+                                  `productos.${index}.expanded`,
                                   true
                                 );
                                 const scrollHeight = event.target.scrollHeight;
@@ -1322,10 +1246,17 @@ const OrdenServicio = ({
                                 }px`;
                               }
                             }}
-                            disabled={row.disable.descripcion}
-                            value={formik.values.items[index].descripcion}
+                            disabled={row.type === "Delivery" ? true : false}
+                            value={formik.values.productos[index].descripcion}
+                            autoFocus={
+                              row.producto === "Ropa x Kilo"
+                                ? false
+                                : row.type === "Prenda" && row.stado === false
+                                ? false
+                                : true
+                            }
                             className={`${
-                              formik.values.items[index].expanded
+                              formik.values.productos[index].expanded
                                 ? "expanded"
                                 : ""
                             }`}
@@ -1335,14 +1266,14 @@ const OrdenServicio = ({
                             className={"expand-button"}
                             onClick={() => {
                               formik.setFieldValue(
-                                `items.${index}.expanded`,
-                                !formik.values.items[index].expanded
+                                `productos.${index}.expanded`,
+                                !formik.values.productos[index].expanded
                               );
 
-                              handleScrollTop(`items.${index}.descripcion`);
+                              handleScrollTop(`productos.${index}.descripcion`);
                             }}
                           >
-                            {formik.values.items[index].expanded ? (
+                            {formik.values.productos[index].expanded ? (
                               <i className="fa-solid fa-chevron-up" />
                             ) : (
                               <i className="fa-solid fa-chevron-down" />
@@ -1355,7 +1286,7 @@ const OrdenServicio = ({
                       <input
                         type="text"
                         className="txtTotal"
-                        name={`items.${index}.total`}
+                        name={`productos.${index}.total`}
                         autoComplete="off"
                         onDragStart={(e) => e.preventDefault()}
                         onChange={(e) => {
@@ -1365,12 +1296,15 @@ const OrdenServicio = ({
                             : "";
 
                           formik.setFieldValue(
-                            `items.${index}.total`,
+                            `productos.${index}.total`,
                             validInput
                           );
                         }}
-                        disabled={row.disable.total}
-                        value={formik.values.items[index].total}
+                        disabled={iEdit?.estado === "registrado" ? true : false}
+                        value={formik.values.productos[index].total}
+                        onFocus={(e) => {
+                          e.target.select();
+                        }}
                         required
                       />
                     </td>
@@ -1378,18 +1312,16 @@ const OrdenServicio = ({
                       Etiqueta="td"
                       className="space-action"
                       onClick={() => {
-                        if (
-                          (!iEdit || iEdit?.estado === "reservado") &&
-                          formik.values.items[index].identificador !==
-                            getInfoDelivery()._id
-                        ) {
-                          const updatedItems = [...formik.values.items];
-                          updatedItems.splice(index, 1);
-                          formik.setFieldValue("items", updatedItems);
+                        if (!iEdit || iEdit?.estado === "reservado") {
+                          const updatedProductos = [...formik.values.productos];
+                          updatedProductos.splice(index, 1);
+                          formik.setFieldValue("productos", updatedProductos);
                         }
                       }}
                     >
-                      {row.disable.action ? null : (
+                      {row.type === "Delivery" ? (
+                        true
+                      ) : (
                         <Eliminar className="delete-row" />
                       )}
                     </Tag>
@@ -1475,8 +1407,8 @@ const OrdenServicio = ({
                 </tr>
               </tfoot>
             </table>
-            {formik.errors.items && formik.touched.items && (
-              <div className="error-message">{formik.errors.items}</div>
+            {formik.errors.productos && formik.touched.productos && (
+              <div className="error-message">{formik.errors.productos}</div>
             )}
           </div>
           <div className="footer">
@@ -1839,12 +1771,11 @@ const OrdenServicio = ({
                                 "Gratis" &&
                               resValidCupon.promocion.tipoPromocion === "Unico"
                             ) {
-                              const prendaEncontrada = InfoServicios.find(
-                                (p) =>
-                                  p._id === resValidCupon.promocion.prenda[0]
+                              const prendaEncontrada = infoPrendas.find(
+                                (p) => p.name === resValidCupon.promocion.prenda
                               );
                               dscFinal =
-                                prendaEncontrada.precioVenta *
+                                prendaEncontrada.price *
                                 resValidCupon.promocion.descuento;
                             }
                           }
@@ -1854,7 +1785,6 @@ const OrdenServicio = ({
                             codigoPromocion: resValidCupon.promocion.codigo,
                             descripcion: resValidCupon.promocion.descripcion,
                             prenda: resValidCupon.promocion.prenda,
-                            alcance: resValidCupon.promocion.alcance,
                             nMultiplicador: resValidCupon.promocion.descuento,
                             descuento: dscFinal,
                             tipoDescuento:
