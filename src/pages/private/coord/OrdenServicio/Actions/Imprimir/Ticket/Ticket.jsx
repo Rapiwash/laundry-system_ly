@@ -21,15 +21,31 @@ import {
   politicaAbandono,
   simboloMoneda,
 } from "../../../../../../../services/global";
+import { useSelector } from "react-redux";
 
 const Ticket = React.forwardRef((props, ref) => {
   const { forW, infoOrden, InfoNegocio } = props;
   const [listPromos, setListPromos] = useState([]);
   const [sPago, setSPago] = useState();
 
+  const InfoServicios = useSelector((state) => state.servicios.listServicios);
+  const InfoCategorias = useSelector(
+    (state) => state.categorias.listCategorias
+  );
+
+  const getInfoDelivery = () => {
+    const ICategory = InfoCategorias.find((cat) => cat.nivel === "primario");
+    const IService = InfoServicios.find(
+      (service) =>
+        service.idCategoria === ICategory._id && service.nombre === "Delivery"
+    );
+
+    return IService;
+  };
+
   const montoDelivery = (dataC) => {
     if (dataC.Modalidad === "Delivery") {
-      return infoOrden.Producto.find((p) => p.producto === "Delivery").total;
+      return infoOrden.Items.find((p) => p.item === "Delivery").total;
     } else {
       return 0;
     }
@@ -229,24 +245,20 @@ const Ticket = React.forwardRef((props, ref) => {
                   <thead>
                     <tr>
                       <th></th>
-                      <th>Producto</th>
+                      <th>Item</th>
                       <th>Cantidad</th>
                       <th>Total</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {infoOrden.Producto.filter(
-                      (p) => p.categoria !== "Delivery"
+                    {infoOrden.Items.filter(
+                      (p) => p.identificador !== getInfoDelivery()._id
                     ).map((p, index) => (
                       <React.Fragment key={`${infoOrden._id}-${index}`}>
                         <tr>
                           <td>•</td>
-                          <td>{p.producto}</td>
-                          <td>
-                            {p.producto === "Ropa x Kilo"
-                              ? roundDecimal(p.cantidad)
-                              : parseInt(p.cantidad)}
-                          </td>
+                          <td>{p.item}</td>
+                          <td>{roundDecimal(p.cantidad)}</td>
                           <td>{roundDecimal(p.total)}</td>
                         </tr>
                         {forW && p.descripcion ? (
@@ -262,7 +274,7 @@ const Ticket = React.forwardRef((props, ref) => {
                       <td colSpan="3">Subtotal :</td>
                       <td>
                         {roundDecimal(
-                          infoOrden.Producto.reduce(
+                          infoOrden.Items.reduce(
                             (total, p) => total + parseFloat(p.total),
                             0
                           ) - montoDelivery(infoOrden)
@@ -355,9 +367,6 @@ const Ticket = React.forwardRef((props, ref) => {
               NOTA: <span>{politicaAbandono.mResaltado}</span>
               {politicaAbandono.mGeneral}
             </p>
-            {/* <p className="aviso">
-              <span>{politicaAbandono.mExtra}</span>
-            </p> */}
           </div>
           {listPromos.length > 0 ? (
             <div className="container-promociones">
