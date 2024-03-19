@@ -28,7 +28,9 @@ const index = () => {
 
   const [fCli, setFCli] = useState(false);
   const [phoneA, setPhoneA] = useState(
-    infoOrden.celular ? `${codigoPhonePais}${infoOrden.celular}` : ""
+    infoOrden.celular
+      ? `${codigoPhonePais}${infoOrden.celular.replace(/\s/g, "")}`
+      : ""
   );
   const componentRef = React.useRef();
 
