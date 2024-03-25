@@ -166,7 +166,8 @@ const HeaderUser = () => {
             </>
           ) : null}
 
-          {userState.rol === Roles.ADMIN && isSmallScreen ? (
+          {(userState.rol === Roles.ADMIN || userState.rol === Roles.GERENTE) &&
+          isSmallScreen ? (
             <>
               <li>
                 <Link to={`./${PrivateRoutes.PROMOCIONES}`}>Promociones</Link>
