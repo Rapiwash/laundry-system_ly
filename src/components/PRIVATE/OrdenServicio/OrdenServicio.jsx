@@ -155,7 +155,7 @@ const OrdenServicio = ({
           cantidad: true,
           item: true,
           descripcion: isDelivery,
-          total: iEdit.estado !== "registrado" ? false : true,
+          total: iEdit?.estado !== "registrado" ? false : true,
           action: true,
         },
       };
