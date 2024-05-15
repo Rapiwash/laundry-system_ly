@@ -196,7 +196,7 @@ const OrdenServicio = ({
               cantidad: 1,
               item: "Delivery",
               simboloMedida: "vj",
-              descripcion: "Recojo y Entrega",
+              descripcion: "Transporte",
               price: getInfoDelivery()?.precioVenta,
               total: getInfoDelivery()?.precioVenta,
               disable: {
@@ -204,7 +204,7 @@ const OrdenServicio = ({
                 item: true,
                 descripcion: true,
                 total: false,
-                action: true,
+                action: false,
               },
             },
           ]
