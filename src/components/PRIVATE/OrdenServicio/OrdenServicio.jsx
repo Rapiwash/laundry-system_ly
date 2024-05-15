@@ -155,7 +155,7 @@ const OrdenServicio = ({
           cantidad: true,
           item: true,
           descripcion: isDelivery,
-          total: true,
+          total: iEdit.estado !== "registrado" ? false : true,
           action: true,
         },
       };
@@ -196,7 +196,7 @@ const OrdenServicio = ({
               cantidad: 1,
               item: "Delivery",
               simboloMedida: "vj",
-              descripcion: "Transporte",
+              descripcion: "Recojo y Entrega",
               price: getInfoDelivery()?.precioVenta,
               total: getInfoDelivery()?.precioVenta,
               disable: {
@@ -204,7 +204,7 @@ const OrdenServicio = ({
                 item: true,
                 descripcion: true,
                 total: false,
-                action: false,
+                action: true,
               },
             },
           ]
