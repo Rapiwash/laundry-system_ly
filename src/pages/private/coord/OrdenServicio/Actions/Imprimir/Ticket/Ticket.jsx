@@ -197,7 +197,7 @@ const Ticket = React.forwardRef((props, ref) => {
                   </div>
                   <div className="i-negocio">
                     <span>Direccion</span>
-                    <span>{InfoNegocio?.direccion}asda</span>
+                    <span>{InfoNegocio?.direccion}</span>
                   </div>
                   <div className="i-negocio " style={{ paddingBottom: "0" }}>
                     <span>Telefono de contacto</span>
