@@ -54,7 +54,6 @@ const OrdenServicio = ({
   const iDelivery = useSelector((state) => state.servicios.serviceDelivery);
   const iServicios = useSelector((state) => state.servicios.listServicios);
 
-  const [delivery, setDelivery] = useState(false);
   const [sidePanelVisible, setSidePanelVisible] = useState(false);
 
   const [listCupones, setListCupones] = useState([]);
@@ -399,7 +398,7 @@ const OrdenServicio = ({
         fecha: tFecha(info.dateRecojo),
         hora: tHora(info.dateRecojo),
       },
-      Modalidad: delivery ? "Delivery" : "Tienda",
+      Modalidad: mode,
       Nombre: info.name,
       Items: infoIntem,
       celular: info.phone,
