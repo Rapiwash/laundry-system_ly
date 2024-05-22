@@ -401,10 +401,9 @@ const Ticket = React.forwardRef((props, ref) => {
                               (total, p) => total + parseFloat(p.total),
                               0
                             ) -
-                              infoOrden?.Modalidad ===
-                              "Delivery"
-                              ? montoDelivery()
-                              : 0
+                              (infoOrden?.Modalidad === "Delivery"
+                                ? montoDelivery()
+                                : 0)
                           )}
                         </td>
                       </tr>
